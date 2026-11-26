@@ -1,0 +1,44 @@
+# Exemple refusé du kit : une seule faute, le tag latest ; la CI doit échouer sur ce message (une faute de plus
+# rendrait le message dépendant de l'ordre des règles).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: bonjour
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bonjour
+  template:
+    metadata:
+      labels:
+        app: bonjour
+    spec:
+      runtimeClassName: gvisor
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/nginx/nginx-unprivileged:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+              ephemeral-storage: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080

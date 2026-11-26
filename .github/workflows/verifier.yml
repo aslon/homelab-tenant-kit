@@ -1,0 +1,94 @@
+# Workflow réutilisable de la CI des équipes du homelab (ADR-051). Rejoue les règles réelles des clusters dans un
+# cluster k3d jetable, sur chaque deploy/<app>/{dev,prod} du dépôt appelant, sans rien déployer.
+# Appel (dans le dépôt de l'équipe, .github/workflows/homelab.yml) :
+#   on: pull_request
+#   permissions:
+#     contents: read
+#   jobs:
+#     homelab:
+#       uses: aslon/homelab-tenant-kit/.github/workflows/verifier.yml@<sha du tag>   # ou @v1
+#       with:
+#         team: <équipe>
+# CI verte ne veut pas dire admis : gVisor, déchiffrement des SealedSecret et écarts aux valeurs par défaut de
+# l'équipe restent hors de portée ; les barrières sont celles du cluster.
+name: verifier
+
+on:
+  workflow_call:
+    inputs:
+      team:
+        description: Nom de l'équipe (tenant.yaml), minuscules et chiffres
+        required: true
+        type: string
+      depot:
+        description: Dossier du dépôt qui contient deploy/
+        required: false
+        type: string
+        default: "."
+      version-kit:
+        description: Version du kit (scripts) ; mettre le même SHA que celui de uses quand on épingle
+        required: false
+        type: string
+        default: v1
+      version-regles:
+        description: Ne pas changer hors des tests du kit ; les règles suivent toujours les clusters
+        required: false
+        type: string
+        default: regles-courantes
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash # -eo pipefail : le refus traverse le tee
+    steps:
+      - name: Dépôt de l'équipe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Kit (scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: aslon/homelab-tenant-kit
+          ref: ${{ inputs.version-kit }}
+          path: .homelab-kit
+          persist-credentials: false
+      - name: Kit (règles courantes)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: aslon/homelab-tenant-kit
+          ref: ${{ inputs.version-regles }}
+          path: .homelab-regles
+          persist-credentials: false
+      - name: Outils épinglés
+        run: |
+          .homelab-kit/outils.sh "$RUNNER_TEMP/outils"
+          echo "$RUNNER_TEMP/outils" >> "$GITHUB_PATH"
+      - name: Cluster k3d
+        run: .homelab-kit/cluster.sh "$RUNNER_TEMP/kubeconfig" "$RUNNER_TEMP/outils/sealedsecret-crd.yaml"
+      - name: Vérification
+        env:
+          TEAM: ${{ inputs.team }}
+          DEPOT: ${{ inputs.depot }}
+        run: |
+          KUBECONFIG="$RUNNER_TEMP/kubeconfig" .homelab-kit/verifier.sh --team "$TEAM" --depot "$DEPOT" \
+            --regles .homelab-regles/regles --installer-regles | tee "$RUNNER_TEMP/verdict.txt"
+      - name: Résumé
+        if: always()
+        env:
+          DEPOT: ${{ inputs.depot }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          {
+            echo '## Verdict'
+            echo '```'
+            grep -E '^(OK|REFUS|AVERTISSEMENT|Verdict)' "$RUNNER_TEMP/verdict.txt" 2>/dev/null || echo "pas de verdict"
+            echo '```'
+            if [ -n "$BASE" ]; then .homelab-kit/diff-rendus.sh "$DEPOT" "origin/$BASE"; fi
+          } >> "$GITHUB_STEP_SUMMARY"

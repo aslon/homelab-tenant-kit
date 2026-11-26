@@ -1,0 +1,9 @@
+# Rendu tel qu'Argo CD le fait : kustomize, sans plugins.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: exemple-bonjour
+labels:
+  - pairs:
+      team: exemple
+resources:
+  - app.yaml

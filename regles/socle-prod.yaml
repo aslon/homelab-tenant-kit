@@ -1,0 +1,102 @@
+---
+# Source: frame/templates/socle.yaml
+# Le label team sélectionne le namespace pour les ValidatingAdmissionPolicy (gitops/components/tenants).
+# allowed-hosts : seuls hôtes acceptés par la VAP tenant-restrict-ingress-hosts (ADR-012).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: __TEAM__-__APP__
+  labels:
+    team: __TEAM__
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+  annotations:
+    homelab.alson-lab.fr/allowed-hosts: __APP__.alson-lab.fr
+---
+# Source: frame/templates/socle.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: team-quota
+  namespace: __TEAM__-__APP__
+  labels:
+    team: __TEAM__
+spec:
+  hard:
+    count/configmaps: "30"
+    count/cronjobs.batch: "10"
+    count/deployments.apps: "20"
+    count/ingresses.networking.k8s.io: "5"
+    count/jobs.batch: "20"
+    count/sealedsecrets.bitnami.com: "10"
+    count/secrets: "30"
+    count/serviceaccounts: "10"
+    limits.cpu: "4"
+    limits.ephemeral-storage: 8Gi
+    limits.memory: 4Gi
+    persistentvolumeclaims: "5"
+    pods: "20"
+    requests.cpu: "2"
+    requests.ephemeral-storage: 4Gi
+    requests.memory: 2Gi
+    requests.storage: 20Gi
+    services: "10"
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+---
+# Source: frame/templates/socle.yaml
+# Ex-restrict-priority-class du Kimsufi : un pod de tenant en priorité système préempterait Traefik ou
+# CNPG sur un nœud plein. Un quota à 0 sur ces classes suffit, sans VAP.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: no-system-priority
+  namespace: __TEAM__-__APP__
+  labels:
+    team: __TEAM__
+spec:
+  hard:
+    pods: "0"
+  scopeSelector:
+    matchExpressions:
+      - scopeName: PriorityClass
+        operator: In
+        values:
+          - system-cluster-critical
+          - system-node-critical
+---
+# Source: frame/templates/socle.yaml
+# Bornes par pod, pas par conteneur : pour `type: Container`, l'API recopie `max` dans `default`, et un
+# pod sans limites recevrait le maximum avant la validation, sans que la VAP tenant-require-limits le
+# voie (ADR-004 : limites obligatoires). `type: Pod` n'a pas de valeur par défaut.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: team-limits
+  namespace: __TEAM__-__APP__
+  labels:
+    team: __TEAM__
+spec:
+  limits:
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: 4Gi
+    - type: PersistentVolumeClaim
+      max:
+        storage: 10Gi
+      min:
+        storage: 1Gi
+---
+# Source: frame/templates/socle.yaml
+# Pas de jeton d'API monté par défaut (mutate-default-sa du Kimsufi) : une app qui appelle l'API
+# déclare son propre ServiceAccount.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: __TEAM__-__APP__
+  labels:
+    team: __TEAM__
+automountServiceAccountToken: false

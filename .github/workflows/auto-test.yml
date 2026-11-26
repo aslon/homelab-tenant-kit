@@ -1,0 +1,41 @@
+# Auto-test du kit, à chaque poussée : le workflow réutilisable accepte exemples/accepte (appel réel, comme une
+# équipe), et le vérificateur refuse exemples/refuse sur le message attendu (témoin négatif vérifié par son message).
+name: auto-test
+
+on:
+  push:
+    branches: [main, preparation]
+
+permissions:
+  contents: read
+
+jobs:
+  accepte:
+    uses: ./.github/workflows/verifier.yml
+    with:
+      team: exemple
+      depot: exemples/accepte
+      version-kit: ${{ github.sha }}
+      version-regles: ${{ github.sha }}
+
+  refuse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: ./outils.sh "$RUNNER_TEMP/outils" && echo "$RUNNER_TEMP/outils" >> "$GITHUB_PATH"
+      - run: ./cluster.sh "$RUNNER_TEMP/kubeconfig" "$RUNNER_TEMP/outils/sealedsecret-crd.yaml"
+      - name: Refus attendu, sur son message
+        run: |
+          set +e
+          KUBECONFIG="$RUNNER_TEMP/kubeconfig" ./verifier.sh --team exemple --depot exemples/refuse --installer-regles > sortie.txt 2>&1
+          code=$?
+          cat sortie.txt
+          [ "$code" = 1 ] || { echo "code $code au lieu de 1"; exit 1; }
+          grep -q "REFUS bonjour/dev : .*tenant-restrict-images.*Le tag latest est interdit" sortie.txt || { echo "refus pour une autre raison"; exit 1; }
+          grep -q "^Verdict: 0 accepté(s), 1 refusé(s)$" sortie.txt

@@ -1,0 +1,621 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-enforce-namespace
+spec:
+  failurePolicy: Fail
+  matchConditions:
+    - expression: '!object.metadata.name.startsWith(''kube-'') && !(object.metadata.name in [''default'', ''argocd'', ''authentik'', ''cert-manager'', ''cloudflared'', ''cnpg-system'', ''sauvegardes'', ''traefik'', ''routes-plateforme''])'
+      name: not-platform
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespaces
+  validations:
+    - expression: variables.team.matches('^[a-z0-9]+$')
+      message: Le label team est obligatoire, en minuscules et chiffres, sans tiret.
+    - expression: object.metadata.name.startsWith(variables.team + '-') && size(object.metadata.name) > size(variables.team) + 1
+      messageExpression: '''Le namespace '' + object.metadata.name + '' doit se nommer <team>-<app> (team : '' + variables.team + '').'''
+    - expression: '''pod-security.kubernetes.io/enforce'' in variables.labels && variables.labels[''pod-security.kubernetes.io/enforce''] == ''restricted'''
+      message: Un namespace de tenant garde pod-security.kubernetes.io/enforce=restricted.
+  variables:
+    - expression: 'has(object.metadata.labels) ? object.metadata.labels : {}'
+      name: labels
+    - expression: '''team'' in variables.labels ? variables.labels[''team''] : '''''
+      name: team
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-require-labels
+spec:
+  failurePolicy: Fail
+  matchConditions:
+    - expression: '!has(object.metadata.ownerReferences)'
+      name: not-owned
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - deployments
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - jobs
+          - cronjobs
+  validations:
+    - expression: '''app'' in variables.labels && variables.labels[''app''] != '''''
+      messageExpression: '''Le label app est obligatoire sur ce '' + object.kind + ''.'''
+    - expression: '''team'' in variables.labels && variables.labels[''team''] == namespaceObject.metadata.labels[''team'']'
+      messageExpression: '''Le label team de ce '' + object.kind + '' doit valoir '' + namespaceObject.metadata.labels[''team''] + ''.'''
+  variables:
+    - expression: 'has(object.metadata.labels) ? object.metadata.labels : {}'
+      name: labels
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-require-limits
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - cronjobs
+          - jobs
+  validations:
+    - expression: '!has(variables.podSpec.terminationGracePeriodSeconds) || variables.podSpec.terminationGracePeriodSeconds <= 30'
+      message: terminationGracePeriodSeconds ne peut pas dépasser 30 secondes.
+    - expression: variables.containers.all(c, has(c.resources) && has(c.resources.limits) && 'cpu' in c.resources.limits && 'memory' in c.resources.limits)
+      message: Chaque conteneur doit déclarer resources.limits.cpu et resources.limits.memory.
+    - expression: variables.containers.all(c, has(c.resources) && has(c.resources.limits) && 'ephemeral-storage' in c.resources.limits)
+      message: Chaque conteneur doit déclarer resources.limits.ephemeral-storage.
+    - expression: '!has(variables.podSpec.volumes) || variables.podSpec.volumes.all(v, !has(v.emptyDir) || has(v.emptyDir.sizeLimit))'
+      message: Chaque emptyDir doit déclarer sizeLimit.
+  variables:
+    - expression: 'object.kind == ''Pod'' ? object.spec : object.kind == ''CronJob'' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec'
+      name: podSpec
+    - expression: 'variables.podSpec.containers + (has(variables.podSpec.initContainers) ? variables.podSpec.initContainers : [])'
+      name: containers
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-require-runtime
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - cronjobs
+          - jobs
+  validations:
+    - expression: (has(variables.podSpec.runtimeClassName) && variables.podSpec.runtimeClassName == 'gvisor') || (variables.exception && !has(variables.podSpec.runtimeClassName) && has(variables.podSpec.hostUsers) && variables.podSpec.hostUsers == false)
+      message: runtimeClassName doit valoir gvisor (ADR-021).
+  variables:
+    - expression: 'object.kind == ''Pod'' ? object.spec : object.kind == ''CronJob'' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec'
+      name: podSpec
+    - expression: 'has(namespaceObject.metadata.annotations) ? namespaceObject.metadata.annotations : {}'
+      name: annotations
+    - expression: '''homelab.alson-lab.fr/runc-exception'' in variables.annotations && variables.annotations[''homelab.alson-lab.fr/runc-exception''] == ''true'''
+      name: exception
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-cluster-resources
+spec:
+  failurePolicy: Ignore
+  matchConditions:
+    - expression: has(request.userInfo.groups) && request.userInfo.groups.exists(g, g.startsWith('oidc:'))
+      name: team-member
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - apiextensions.k8s.io
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - customresourcedefinitions
+      - apiGroups:
+          - rbac.authorization.k8s.io
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - clusterroles
+          - clusterrolebindings
+      - apiGroups:
+          - admissionregistration.k8s.io
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - mutatingwebhookconfigurations
+          - validatingwebhookconfigurations
+          - validatingadmissionpolicies
+          - validatingadmissionpolicybindings
+  validations:
+    - expression: "false"
+      messageExpression: '''Les équipes ne peuvent pas modifier les ressources cluster ('' + request.kind.kind + '').'''
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-images
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+          - pods/ephemeralcontainers
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - cronjobs
+          - jobs
+  validations:
+    - expression: variables.images.all(i, !i.matches(':latest(@|$)') && (i.matches('@sha256:[0-9a-f]{64}$') || i.matches(':[A-Za-z0-9_][A-Za-z0-9_.-]*$')))
+      message: Le tag latest est interdit et un tag ou un digest est obligatoire (nginx:1.31, pas nginx ni nginx:latest).
+    - expression: variables.images.all(i, i.matches('^(rg\\.fr-par\\.scw\\.cloud|docker\\.io|ghcr\\.io|registry\\.k8s\\.io|quay\\.io)/') || (!i.startsWith('localhost/') && i.matches('^[a-z0-9_-]+(/[a-z0-9._-]+)?(:[A-Za-z0-9_.-]+)?(@sha256:[0-9a-f]{64})?$')))
+      message: Registre non autorisé. Registres acceptés rg.fr-par.scw.cloud, docker.io, ghcr.io, registry.k8s.io, quay.io.
+  variables:
+    - expression: 'object.kind == ''Pod'' ? object.spec : object.kind == ''CronJob'' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec'
+      name: podSpec
+    - expression: 'variables.podSpec.containers.map(c, c.image) + (has(variables.podSpec.initContainers) ? variables.podSpec.initContainers.map(c, c.image) : []) + (has(variables.podSpec.ephemeralContainers) ? variables.podSpec.ephemeralContainers.map(c, c.image) : [])'
+      name: images
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-ingress
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - networking.k8s.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - ingresses
+  validations:
+    - expression: has(object.spec.ingressClassName) && object.spec.ingressClassName == 'traefik'
+      message: ingressClassName doit valoir traefik.
+    - expression: '!has(object.spec.defaultBackend)'
+      message: spec.defaultBackend est interdit, chaque règle porte son hôte.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-ingress-hosts
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - networking.k8s.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - ingresses
+  validations:
+    - expression: variables.rules.all(r, has(r.host) && r.host.matches('^[a-z0-9-]+\\.alson-lab\\.fr$'))
+      message: L'hôte doit être de la forme <app>.alson-lab.fr ou <app>-dev.alson-lab.fr, sans wildcard (ADR-012).
+    - expression: variables.rules.all(r, !has(r.host) || !r.host.matches('^(argocd|auth|kube|nas|vpn)(-dev)?\\.alson-lab\\.fr$'))
+      message: Hôte réservé à la plateforme (tofu/variables.tf, exposed_hosts).
+    - expression: variables.rules.all(r, has(r.host) && r.host in variables.allowed)
+      message: Hôte absent de l'annotation homelab.alson-lab.fr/allowed-hosts du namespace (tenant.yaml, ADR-012).
+  variables:
+    - expression: 'has(namespaceObject.metadata.annotations) ? namespaceObject.metadata.annotations : {}'
+      name: annotations
+    - expression: '''homelab.alson-lab.fr/allowed-hosts'' in variables.annotations ? variables.annotations[''homelab.alson-lab.fr/allowed-hosts''].split('','') : []'
+      name: allowed
+    - expression: 'has(object.spec.rules) ? object.spec.rules : []'
+      name: rules
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-rolebindings
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - rbac.authorization.k8s.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - rolebindings
+  validations:
+    - expression: object.roleRef.kind == 'ClusterRole' && (object.roleRef.name == 'tenant-member' || (object.roleRef.name == 'traefik-espace' && size(object.subjects) > 0 && object.subjects.all(s, s.kind == 'ServiceAccount' && s.namespace == 'traefik' && s.name == 'traefik')))
+      message: Un RoleBinding de tenant référence le ClusterRole tenant-member, rien d'autre (traefik-espace pour le seul ServiceAccount de Traefik).
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-sealed-secrets
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - bitnami.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - sealedsecrets
+  validations:
+    - expression: variables.wide.all(k, !(k in variables.top) && !(k in variables.template))
+      message: Un SealedSecret d'équipe reste en portée strict (kubeseal --scope strict).
+  variables:
+    - expression: 'has(object.metadata.annotations) ? object.metadata.annotations : {}'
+      name: top
+    - expression: 'has(object.spec.template) && has(object.spec.template.metadata) && has(object.spec.template.metadata.annotations) ? object.spec.template.metadata.annotations : {}'
+      name: template
+    - expression: '[''sealedsecrets.bitnami.com/cluster-wide'', ''sealedsecrets.bitnami.com/namespace-wide'']'
+      name: wide
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-services
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - services
+  validations:
+    - expression: '!has(object.spec.externalIPs) || size(object.spec.externalIPs) == 0'
+      message: spec.externalIPs est interdit.
+    - expression: '!has(object.spec.type) || object.spec.type != ''ExternalName'''
+      message: Service de type ExternalName interdit (Traefik le suivrait vers un service interne).
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-storage-class
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - persistentvolumeclaims
+  validations:
+    - expression: '!has(object.spec.storageClassName) || object.spec.storageClassName == ''local-path'''
+      message: StorageClass non autorisée. Utiliser local-path ou omettre storageClassName.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-restrict-traefik-annotations
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: team
+          operator: Exists
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - services
+      - apiGroups:
+          - networking.k8s.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - ingresses
+  validations:
+    - expression: '!has(object.metadata.annotations) || object.metadata.annotations.all(k, !k.startsWith(''traefik.''))'
+      message: Annotation Traefik interdite sur une ressource d'équipe (ADR-021).
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-enforce-namespace
+spec:
+  policyName: tenant-enforce-namespace
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-require-labels
+spec:
+  policyName: tenant-require-labels
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-require-limits
+spec:
+  policyName: tenant-require-limits
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-require-runtime
+spec:
+  policyName: tenant-require-runtime
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-cluster-resources
+spec:
+  policyName: tenant-restrict-cluster-resources
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-images
+spec:
+  policyName: tenant-restrict-images
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-ingress
+spec:
+  policyName: tenant-restrict-ingress
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-ingress-hosts
+spec:
+  policyName: tenant-restrict-ingress-hosts
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-rolebindings
+spec:
+  policyName: tenant-restrict-rolebindings
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-sealed-secrets
+spec:
+  policyName: tenant-restrict-sealed-secrets
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-services
+spec:
+  policyName: tenant-restrict-services
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-storage-class
+spec:
+  policyName: tenant-restrict-storage-class
+  validationActions:
+    - Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-restrict-traefik-annotations
+spec:
+  policyName: tenant-restrict-traefik-annotations
+  validationActions:
+    - Deny
+---
+apiVersion: node.k8s.io/v1
+handler: runsc
+kind: RuntimeClass
+metadata:
+  name: gvisor
