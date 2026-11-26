@@ -65,12 +65,15 @@ done
 echo "[2/5] Contrôles statiques (schémas, types, namespace, quotas, images)"
 statique_ko=" " # « app/env » refusés au contrôle statique (bash 3.2 : pas de tableau associatif)
 k8s="$(sed -n 's/^k3s=v\([0-9.]*\)+.*/\1/p' "$REGLES/SOURCE" 2>/dev/null || true)"
+# Schémas de kubeconform à un commit fixe (le défaut suit master) ; template de kubeconform, pas du shell.
+# shellcheck disable=SC2016
+SCHEMAS='https://raw.githubusercontent.com/yannh/kubernetes-json-schema/e62c03bd5a52fd34ff6ac28d083e2a300e0ae7c1/{{.NormalizedKubernetesVersion}}-standalone{{.StrictSuffix}}/{{.ResourceKind}}{{.KindSuffix}}.json'
 for c in "${cibles[@]+"${cibles[@]}"}"; do
   app="${c%/*}"; env="${c#*/}"; f="$tmp/$app-$env.yaml"; ns="$TEAM-$app"; msgs=()
   # Pré-filtre de schémas (ADR-021) ; les CRD (SealedSecret) sont validées ensuite par le cluster.
   if command -v kubeconform >/dev/null && [ -n "$k8s" ]; then
     while IFS= read -r m; do [ -n "$m" ] && msgs+=("schéma : $m"); done < <(kubeconform -strict -ignore-missing-schemas \
-      -kubernetes-version "$k8s" -output text "$f" 2>&1 | grep -vE '^Summary:' | sed -E 's#^[^ ]+ - ##' || true)
+      -schema-location "$SCHEMAS" -kubernetes-version "$k8s" -output text "$f" 2>&1 | grep -vE '^Summary:' | sed -E 's#^[^ ]+ - ##' || true)
   fi
   while IFS='|' read -r av kind nsobj; do
     [ -n "$kind" ] || continue
