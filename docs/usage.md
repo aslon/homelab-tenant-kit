@@ -160,7 +160,7 @@ images:
     digest: sha256:<64 caractères hexadécimaux>
 ```
 
-Protégez `main` du dépôt de déploiement (PR et revue obligatoires, check `homelab / verifier` requis, pas de
+Protégez `main` du dépôt de déploiement (dépôt public, ou privé sur un plan GitHub qui applique les règles ; PR et revue obligatoires, check `homelab / verifier` requis, pas de
 force-push) : c'est votre seul contrôle avant la production.
 
 ### Changer la structure : `base/`
@@ -183,6 +183,12 @@ modèle) rejoue **les règles réelles des clusters** dans un cluster jetable, s
 - **Vert ne veut pas dire admis** : la CI suppose les valeurs par défaut de votre équipe (une app par dossier,
   exposée en `<app>-dev.alson-lab.fr` et `<app>.alson-lab.fr`) et ne voit ni la compatibilité gVisor de votre image
   ni le déchiffrement de vos SealedSecret. Argo CD reste le juge ; un écart entre les deux, signalez-le à l'admin.
+
+### Mettre à jour la CI (PR Dependabot)
+
+À chaque nouvelle version du kit, Dependabot ouvre une PR qui change le SHA de `uses:` dans
+`.github/workflows/homelab.yml`. Elle ne change pas `version-kit`, qui doit valoir le même SHA : recopiez-le dans
+la même PR. Tant que les deux diffèrent, la CI échoue avec « Mettez version-kit au même SHA que uses: ».
 
 ## Passer en production, la première fois
 
@@ -232,7 +238,9 @@ Première connexion :
 ### kubectl sur dev
 
 En dev seulement, `kubectl` lit vos namespaces depuis votre poste : pods, journaux, événements, et `exec` dans un
-conteneur. Rien ne s'écrit par là (le déploiement reste la fusion sur `main`), et la prod n'a pas d'accès `kubectl`.
+conteneur. Il ne permet pas de modifier les ressources Kubernetes (le déploiement reste la fusion sur `main`) ;
+`exec` exécute toutefois des commandes dans vos conteneurs de dev, y compris des commandes qui modifient leurs
+fichiers ou leurs données. La prod n'a pas d'accès `kubectl`.
 
 **Une fois** : installez `cloudflared` et le greffon kubelogin (`kubectl oidc-login`), puis demandez à l'admin votre
 fichier `homelab-dev-<équipe>.yaml` (il ne contient aucun secret).
