@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 438" width="760" height="438" role="img" aria-labelledby="t d">
+  <title id="t">Le parcours d'arrivée</title>
+  <desc id="d">1. Vous : demandez l'accès à l'admin. 2. Vous : créez votre dépôt depuis le modèle et donnez son adresse. 3. L'admin : déclare votre équipe et vous remet de quoi vous brancher. 4. Vous : première pull request, votre app en ligne en dev. 5. Vous, puis l'admin : demandez la prod ; une fois ouverte, vos fusions y partent seules.</desc>
+  <style>
+    .cadre { fill: #ffffff; stroke: #e6e6e6; }
+    .carte { fill: #f5f5f5; }
+    .num { fill: #1a1a1a; }
+    .chiffre { font: 600 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #ffffff; text-anchor: middle; }
+    .vous { fill: #eef7f1; stroke: #b9dcc6; }
+    .admin { fill: #f3effb; stroke: #cfc2ee; }
+    .badge { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #333333; text-anchor: middle; }
+    .titre { font: 600 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1a1a1a; }
+    .sous { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #666666; }
+    .lien { stroke: #c8c8c8; stroke-width: 2; }
+    @media (prefers-color-scheme: dark) {
+      .cadre { fill: #0d1117; stroke: #30363d; }
+      .carte { fill: #161b22; }
+      .num { fill: #e6edf3; }
+      .chiffre { fill: #0d1117; }
+      .vous { fill: #12261a; stroke: #2f6b45; }
+      .admin { fill: #221a36; stroke: #5b4a8f; }
+      .badge, .titre { fill: #e6edf3; }
+      .sous { fill: #9aa4ae; }
+      .lien { stroke: #30363d; }
+    }
+  </style>
+  <rect class="cadre" x="1" y="1" width="758" height="436" rx="14"/>
+  <path class="lien" d="M56 54 V384"/>
+
+  <rect class="carte" x="24" y="22" width="712" height="64" rx="10"/>
+  <circle class="num" cx="56" cy="54" r="14"/><text class="chiffre" x="56" y="59">1</text>
+  <rect class="vous" x="84" y="42" width="130" height="24" rx="12"/><text class="badge" x="149" y="59">Vous</text>
+  <text class="titre" x="232" y="49">Demandez l'accès à l'admin</text>
+  <text class="sous" x="232" y="71">Nom de l'équipe, comptes GitHub des membres, nom de votre app</text>
+
+  <rect class="carte" x="24" y="104" width="712" height="64" rx="10"/>
+  <circle class="num" cx="56" cy="136" r="14"/><text class="chiffre" x="56" y="141">2</text>
+  <rect class="vous" x="84" y="124" width="130" height="24" rx="12"/><text class="badge" x="149" y="141">Vous</text>
+  <text class="titre" x="232" y="131">Créez votre dépôt depuis le modèle</text>
+  <text class="sous" x="232" y="153">« Use this template », puis donnez son adresse à l'admin</text>
+
+  <rect class="carte" x="24" y="186" width="712" height="64" rx="10"/>
+  <circle class="num" cx="56" cy="218" r="14"/><text class="chiffre" x="56" y="223">3</text>
+  <rect class="admin" x="84" y="206" width="130" height="24" rx="12"/><text class="badge" x="149" y="223">L'admin</text>
+  <text class="titre" x="232" y="213">Déclare votre équipe</text>
+  <text class="sous" x="232" y="235">Et vous remet de quoi vous brancher (clés, noms d'hôtes)</text>
+
+  <rect class="carte" x="24" y="268" width="712" height="64" rx="10"/>
+  <circle class="num" cx="56" cy="300" r="14"/><text class="chiffre" x="56" y="305">4</text>
+  <rect class="vous" x="84" y="288" width="130" height="24" rx="12"/><text class="badge" x="149" y="305">Vous</text>
+  <text class="titre" x="232" y="295">Première pull request</text>
+  <text class="sous" x="232" y="317">Suivez le tutoriel : votre app en ligne en dev</text>
+
+  <rect class="carte" x="24" y="350" width="712" height="64" rx="10"/>
+  <circle class="num" cx="56" cy="382" r="14"/><text class="chiffre" x="56" y="387">5</text>
+  <rect class="vous" x="84" y="370" width="62" height="24" rx="12"/><text class="badge" x="115" y="387">Vous</text>
+  <rect class="admin" x="152" y="370" width="62" height="24" rx="12"/><text class="badge" x="183" y="387">Admin</text>
+  <text class="titre" x="232" y="377">Demandez la prod</text>
+  <text class="sous" x="232" y="399">Une fois ouverte par l'admin, vos fusions y partent seules</text>
+</svg>

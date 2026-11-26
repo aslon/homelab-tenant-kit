@@ -81,9 +81,6 @@ for c in "${cibles[@]+"${cibles[@]}"}"; do
     grep -qx "$grp/$kind" "$REGLES/types.txt" || msgs+=("type $grp/$kind non admis (liste blanche de l'AppProject)")
     [ -z "$nsobj" ] || [ "$nsobj" = "$ns" ] || msgs+=("$kind dans le namespace $nsobj au lieu de $ns")
   done < <(yq -N '[.apiVersion // "", .kind // "", .metadata.namespace // ""] | join("|")' "$f")
-  while IFS= read -r img; do
-    [ -n "$img" ] && [[ "$img" != *@sha256:* ]] && echo "AVERTISSEMENT $c : image sans digest ($img), obligatoire à l'ADR-050"
-  done < <(yq -N '.. | select(has("image")) | .image' "$f" 2>/dev/null | sort -u)
   # Ce qu'un dry-run ne voit pas : LimitRange par pod et quota du namespace, jamais évalués sans pod créé.
   quotas="$(yq -o=json -I=0 'select(.kind == "ResourceQuota" and .metadata.name == "team-quota") | .spec.hard' "$REGLES/socle-$env.yaml")"
   maxpod="$(yq -o=json -I=0 'select(.kind == "LimitRange") | .spec.limits[] | select(.type == "Pod") | .max' "$REGLES/socle-$env.yaml")"

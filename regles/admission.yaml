@@ -281,8 +281,8 @@ spec:
           - cronjobs
           - jobs
   validations:
-    - expression: variables.images.all(i, !i.matches(':latest(@|$)') && (i.matches('@sha256:[0-9a-f]{64}$') || i.matches(':[A-Za-z0-9_][A-Za-z0-9_.-]*$')))
-      message: Le tag latest est interdit et un tag ou un digest est obligatoire (nginx:1.31, pas nginx ni nginx:latest).
+    - expression: variables.images.all(i, !i.matches(':latest(@|$)') && i.matches('@sha256:[0-9a-f]{64}$'))
+      message: 'Le tag latest est interdit et un digest est obligatoire (ADR-050) : nginx:1.31@sha256:<64 hex> ou nginx@sha256:<64 hex>, pas nginx:1.31 ni nginx:latest.'
     - expression: variables.images.all(i, i.matches('^(rg\\.fr-par\\.scw\\.cloud|docker\\.io|ghcr\\.io|registry\\.k8s\\.io|quay\\.io)/') || (!i.startsWith('localhost/') && i.matches('^[a-z0-9_-]+(/[a-z0-9._-]+)?(:[A-Za-z0-9_.-]+)?(@sha256:[0-9a-f]{64})?$')))
       message: Registre non autorisé. Registres acceptés rg.fr-par.scw.cloud, docker.io, ghcr.io, registry.k8s.io, quay.io.
   variables:

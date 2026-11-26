@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 544" width="760" height="544" role="img" aria-labelledby="t d">
+  <title id="t">Le chemin d'une version</title>
+  <desc id="d">Dépôt de code : PR fusionnée, la CI construit et pousse l'image 1.4.0. Pull request « hello 1.4.0 en dev » : l'image écrite dans dev/. Fusion : cluster dev, test sur hello-dev.alson-lab.fr. Pull request « hello 1.4.0 en prod » : la même image recopiée dans prod/, relue. Fusion : cluster prod. Retour arrière : git revert de la pull request.</desc>
+  <style>
+    .cadre { fill: #ffffff; stroke: #e6e6e6; }
+    .carte { fill: #f5f5f5; }
+    .dev { fill: #eef7f1; stroke: #b9dcc6; stroke-width: 1.5; }
+    .prod { fill: #eef3fc; stroke: #b8cdee; stroke-width: 1.5; }
+    .etiq { font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #888888; letter-spacing: 0.04em; }
+    .titre { font: 600 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1a1a1a; text-anchor: middle; }
+    .sous { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #666666; text-anchor: middle; }
+    .note { font: 400 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #666666; text-anchor: middle; }
+    .fleche { stroke: #9a9a9a; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    @media (prefers-color-scheme: dark) {
+      .cadre { fill: #0d1117; stroke: #30363d; }
+      .carte { fill: #161b22; }
+      .dev { fill: #12261a; stroke: #2f6b45; }
+      .prod { fill: #121d33; stroke: #34558f; }
+      .titre { fill: #e6edf3; }
+      .etiq, .sous, .note { fill: #9aa4ae; }
+      .fleche { stroke: #6e7681; }
+    }
+  </style>
+  <rect class="cadre" x="1" y="1" width="758" height="542" rx="14"/>
+
+  <rect class="carte" x="24" y="22" width="712" height="64" rx="10"/>
+  <text class="etiq" x="40" y="40">CODE</text>
+  <text class="titre" x="380" y="49">PR fusionnée dans votre dépôt de code</text>
+  <text class="sous" x="380" y="72">Votre CI construit l'image 1.4.0 et la pousse (tag et digest)</text>
+  <path class="fleche" d="M380 96 v14 M375 105 l5 5 l5 -5"/>
+
+  <rect class="carte" x="24" y="120" width="712" height="64" rx="10"/>
+  <text class="etiq" x="40" y="138">DÉPLOIEMENT</text>
+  <text class="titre" x="380" y="147">Pull request « hello 1.4.0 en dev »</text>
+  <text class="sous" x="380" y="170">L'image écrite dans dev/, à la main ou par votre CI</text>
+  <path class="fleche" d="M380 194 v14 M375 203 l5 5 l5 -5"/>
+
+  <rect class="dev" x="24" y="218" width="712" height="64" rx="10"/>
+  <text class="titre" x="380" y="245">Fusion : la version part en dev</text>
+  <text class="sous" x="380" y="268">Vous testez sur hello-dev.alson-lab.fr ; la prod ne bouge pas</text>
+  <path class="fleche" d="M380 292 v14 M375 301 l5 5 l5 -5"/>
+
+  <rect class="carte" x="24" y="316" width="712" height="64" rx="10"/>
+  <text class="etiq" x="40" y="334">DÉPLOIEMENT</text>
+  <text class="titre" x="380" y="343">Pull request « hello 1.4.0 en prod »</text>
+  <text class="sous" x="380" y="366">La même image recopiée dans prod/, sans reconstruire ; relue</text>
+  <path class="fleche" d="M380 390 v14 M375 399 l5 5 l5 -5"/>
+
+  <rect class="prod" x="24" y="414" width="712" height="64" rx="10"/>
+  <text class="titre" x="380" y="441">Fusion : la version part en prod</text>
+  <text class="sous" x="380" y="464">Sur hello.alson-lab.fr, sans autre geste</text>
+
+  <text class="note" x="380" y="514">Retour arrière : git revert de la pull request, puis fusion</text>
+</svg>

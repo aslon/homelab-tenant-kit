@@ -7,6 +7,16 @@ cluster k3d jetable. Rien n'est déployé, aucun secret n'est demandé.
 Ce dépôt est **généré** depuis le dépôt homelab (privé) : n'y proposez pas de modification, signalez plutôt un faux
 verdict à l'admin.
 
+## Guide des équipes
+
+- **[Vue d'ensemble](docs/vue-ensemble.md)**, à lire en premier : à quoi sert le homelab, dev et prod, la
+  sécurité, vos données, les prérequis et le parcours d'arrivée.
+- **Tutoriel** : le [modèle de dépôt](https://github.com/aslon/homelab-tenant-template) (« Use this template »,
+  `init.sh`, première PR) ; la CI y est déjà branchée.
+- **[Usage courant](docs/usage.md)** : fonctionnement, livrer une version, passer en prod, accès, `kubectl` sur dev,
+  secrets.
+- **[Référence](docs/reference.md)** : règles et messages de refus, quotas, réseau, dépannage, limites.
+
 ## Brancher la CI
 
 Dans votre dépôt de déploiement, `.github/workflows/homelab.yml` :
@@ -38,7 +48,7 @@ Pour chaque `deploy/<app>/dev` et `deploy/<app>/prod` :
 2. schémas (kubeconform), types autorisés, namespace `<équipe>-<app>`, LimitRange par pod et somme face au quota ;
 3. admission à blanc dans le cluster jetable (`--dry-run=server --warnings-as-errors`) : un refus affiche le message
    exact du cluster ;
-4. image sans digest : avertissement ;
+4. image sans digest : refusée par la règle copiée (digest obligatoire) ;
 5. sur une PR, la différence des rendus avec la branche cible, dans le résumé du job.
 
 ## Ce que la CI ne garantit pas

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 452" width="760" height="452" role="img" aria-labelledby="t d">
+  <title id="t">Comment fonctionne un déploiement</title>
+  <desc id="d">Votre dépôt de code : la CI construit une image. Votre dépôt de déploiement : vous choisissez la version. Argo CD applique les changements. Puis dev pour tester et prod pour vos utilisateurs ; la même image passe de dev à prod par pull request.</desc>
+  <style>
+    .cadre { fill: #ffffff; stroke: #e6e6e6; }
+    .carte { fill: #f5f5f5; }
+    .dev { fill: #eef7f1; stroke: #b9dcc6; stroke-width: 1.5; }
+    .prod { fill: #eef3fc; stroke: #b8cdee; stroke-width: 1.5; }
+    .titre { font: 600 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1a1a1a; text-anchor: middle; }
+    .sous { font: 400 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #666666; text-anchor: middle; }
+    .note { font: 400 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #666666; text-anchor: middle; }
+    .fleche { stroke: #9a9a9a; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .promo { stroke: #9a9a9a; stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; }
+    @media (prefers-color-scheme: dark) {
+      .cadre { fill: #0d1117; stroke: #30363d; }
+      .carte { fill: #161b22; }
+      .dev { fill: #12261a; stroke: #2f6b45; }
+      .prod { fill: #121d33; stroke: #34558f; }
+      .titre { fill: #e6edf3; }
+      .sous, .note { fill: #9aa4ae; }
+      .fleche, .promo { stroke: #6e7681; }
+    }
+  </style>
+  <rect class="cadre" x="1" y="1" width="758" height="450" rx="14"/>
+
+  <rect class="carte" x="24" y="22" width="712" height="64" rx="10"/>
+  <text class="titre" x="380" y="49">Votre dépôt de code</text>
+  <text class="sous" x="380" y="72">Votre CI construit une image</text>
+  <path class="fleche" d="M380 96 v14 M375 105 l5 5 l5 -5"/>
+
+  <rect class="carte" x="24" y="120" width="712" height="64" rx="10"/>
+  <text class="titre" x="380" y="147">Votre dépôt de déploiement</text>
+  <text class="sous" x="380" y="170">Vous choisissez la version à déployer, par pull request</text>
+  <path class="fleche" d="M380 194 v14 M375 203 l5 5 l5 -5"/>
+
+  <rect class="carte" x="24" y="218" width="712" height="64" rx="10"/>
+  <text class="titre" x="380" y="245">Argo CD</text>
+  <text class="sous" x="380" y="268">Applique automatiquement les changements</text>
+  <path class="fleche" d="M197 292 v14 M192 301 l5 5 l5 -5"/>
+  <path class="fleche" d="M563 292 v14 M558 301 l5 5 l5 -5"/>
+
+  <rect class="dev" x="24" y="316" width="346" height="72" rx="10"/>
+  <text class="titre" x="197" y="346">Dev</text>
+  <text class="sous" x="197" y="370">Pour tester</text>
+
+  <rect class="prod" x="390" y="316" width="346" height="72" rx="10"/>
+  <text class="titre" x="563" y="346">Prod</text>
+  <text class="sous" x="563" y="370">Pour vos utilisateurs</text>
+
+  <path class="promo" d="M197 398 v18 h366 v-18"/>
+  <path class="fleche" d="M558 403 l5 -5 l5 5"/>
+  <text class="note" x="380" y="436">Même image, promue de dev à prod par pull request</text>
+</svg>
