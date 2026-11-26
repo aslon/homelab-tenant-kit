@@ -1,0 +1,12 @@
+/ConfigMap
+/PersistentVolumeClaim
+/Service
+/ServiceAccount
+apps/Deployment
+apps/StatefulSet
+autoscaling/HorizontalPodAutoscaler
+batch/CronJob
+batch/Job
+bitnami.com/SealedSecret
+networking.k8s.io/Ingress
+policy/PodDisruptionBudget
