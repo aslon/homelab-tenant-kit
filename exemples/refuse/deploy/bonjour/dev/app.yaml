@@ -1,4 +1,5 @@
-# Exemple refusé du kit : tag latest, sans gVisor ; la CI doit échouer sur ces deux messages.
+# Exemple refusé du kit : une seule faute, le tag latest ; la CI doit échouer sur ce message (une faute de plus
+# rendrait le message dépendant de l'ordre des règles).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,6 +16,7 @@ spec:
       labels:
         app: bonjour
     spec:
+      runtimeClassName: gvisor
       securityContext:
         runAsNonRoot: true
         seccompProfile:
