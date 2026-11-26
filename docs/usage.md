@@ -73,13 +73,34 @@ un second dossier `deploy/<app>/`, déclaré d'abord par l'admin (namespace et n
 ### Vos données
 
 Une base de données ou des fichiers persistants vivent dans un **volume** (PersistentVolumeClaim) de votre namespace,
-déclaré dans git, un par environnement : les données de dev ne remontent jamais en prod.
+déclaré dans git, un par environnement : les données de dev ne remontent jamais en prod. La classe `tenant-local` est
+obligatoire et s'écrit explicitement :
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: donnees
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false # voir « Isolation et suppression »
+spec:
+  storageClassName: tenant-local  # obligatoire : sans elle, le volume est refusé
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi                # c'est aussi la limite : au-delà, l'écriture échoue (disque plein)
+```
 
 - **Aucune sauvegarde par la plateforme.** Exportez vous-même, par exemple un CronJob qui lance `pg_dump` chaque nuit
   et envoie le fichier vers un stockage S3 à vous (la sortie HTTPS est ouverte). Testez la restauration.
 - **Un seul serveur** : pas de réplication ; une panne du serveur arrête votre base jusqu'à son retour.
-- **Disque plus lent sous gVisor** : convenable pour une petite base, pas pour une charge d'écriture intense.
-- **Taille** : voir le [quota](reference.md#les-règles) (volumes de 1 à 10 Gi, 20 Gi par namespace).
+- **Disque plus lent sous gVisor** : convenable pour une petite base, pas pour une charge d'écriture intense. Sous
+  gVisor, le cache d'écriture compte dans la **mémoire** du pod : une base ou un import qui écrit beaucoup a besoin
+  d'une limite mémoire confortable, sinon le pod est tué (`OOMKilled`) avant d'avoir rempli son volume
+  ([dépannage](reference.md#dépannage)).
+- **Taille** : la taille demandée est une **limite dure**, posée par le noyau : votre app reçoit « disque plein » à
+  ce niveau, sans toucher les autres équipes. Un volume ne s'agrandit pas : prévoyez large, dans le
+  [quota](reference.md#les-règles) (volumes de 1 à 10 Gi, 20 Gi par namespace).
 - **Suppression** : sur cette plateforme, Argo CD supprime ce qui disparaît de `main` et le stockage efface les
   données d'un volume supprimé. Protégez chaque volume qui compte par l'annotation décrite ci-dessus.
 

@@ -5,7 +5,7 @@ metadata:
 spec:
   failurePolicy: Fail
   matchConditions:
-    - expression: '!object.metadata.name.startsWith(''kube-'') && !(object.metadata.name in [''default'', ''argocd'', ''authentik'', ''cert-manager'', ''cloudflared'', ''cnpg-system'', ''sauvegardes'', ''traefik'', ''routes-plateforme''])'
+    - expression: '!object.metadata.name.startsWith(''kube-'') && !(object.metadata.name in [''default'', ''argocd'', ''authentik'', ''cert-manager'', ''cloudflared'', ''cnpg-system'', ''sauvegardes'', ''tenant-local'', ''traefik'', ''routes-plateforme''])'
       name: not-platform
   matchConstraints:
     resourceRules:
@@ -460,8 +460,8 @@ spec:
         resources:
           - persistentvolumeclaims
   validations:
-    - expression: '!has(object.spec.storageClassName) || object.spec.storageClassName == ''local-path'''
-      message: StorageClass non autorisée. Utiliser local-path ou omettre storageClassName.
+    - expression: has(object.spec.storageClassName) && object.spec.storageClassName == 'tenant-local'
+      message: 'StorageClass non autorisée : écrire storageClassName: tenant-local dans chaque PersistentVolumeClaim (ADR-052).'
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy

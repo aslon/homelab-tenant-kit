@@ -20,7 +20,7 @@ est refusée avec le message cité.
 | Image avec digest (`nom:tag@sha256:…`, tag facultatif), jamais `:latest`, registres `docker.io`, `ghcr.io`, `quay.io`, `registry.k8s.io`, `rg.fr-par.scw.cloud` | `Le tag latest est interdit et un digest est obligatoire…`, `Registre non autorisé…` |
 | Ingress : classe `traefik`, votre hôte et lui seul, pas d'annotation Traefik, pas de `defaultBackend` | `Hôte absent de l'annotation homelab.alson-lab.fr/allowed-hosts…`, `Annotation Traefik interdite…` |
 | Service : ni `externalIPs`, ni `ExternalName`, ni NodePort, ni LoadBalancer | `spec.externalIPs est interdit.` ; quota dépassé pour les deux derniers |
-| Volume : `local-path` (ou sans `storageClassName`), 1 à 10 Gi | `StorageClass non autorisée…` |
+| Volume : `storageClassName: tenant-local`, écrit explicitement ; 1 à 10 Gi | `StorageClass non autorisée : écrire storageClassName: tenant-local…` |
 | Secret : uniquement en SealedSecret, portée strict | `Un SealedSecret d'équipe reste en portée strict…` |
 
 Les règles exactes, telles que le cluster les applique, sont dans [`regles/admission.yaml`](../regles/admission.yaml).
@@ -70,6 +70,8 @@ appelle vraiment l'API ; sinon, écrivez `automountServiceAccountToken: false` d
 | `is not permitted in project` | Type de ressource non accepté | Le retirer (voir la liste des types) |
 | `exceeded quota` | Quota du namespace | Réduire, ou demander plus à l'admin |
 | Pod en `CrashLoopBackOff` | L'app elle-même (port < 1024, écriture dans un dossier en lecture seule, root, appel système refusé par gVisor) | Image « unprivileged », port > 1024 |
+| Pod redémarré avec `OOMKilled` pendant une grosse écriture (import, envoi de fichiers, archive), alors que l'app consomme peu | Sous gVisor, le cache d'écriture compte dans la mémoire du pod : il dépasse la limite avant d'être écrit sur le disque | Relever `limits.memory` (quelques centaines de Mi pour une base ou un import) ; écrire par morceaux en forçant l'écriture sur disque (`fsync`) |
+| Écriture refusée : `No space left on device` | Volume plein : sa taille demandée est une limite dure | Faire de la place, ou un volume plus grand (un volume ne s'agrandit pas : copier les données dans un nouveau) |
 | 404 sur l'hôte | Hôte de l'Ingress différent de celui attribué, ou exposition pas encore faite par l'admin | Vérifier `host:` ; demander à l'admin |
 | `kubectl` : `bind: address already in use` | Port local du tunnel déjà pris | Un autre port, dans `cloudflared` et dans `server:` |
 | `kubectl` : `Forbidden` | Action hors de vos droits (lecture et `exec` seulement), ou mauvaise identité | Voir l'[usage](usage.md#kubectl-sur-dev) ; `kubectl oidc-login clean` |
