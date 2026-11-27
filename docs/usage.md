@@ -14,7 +14,8 @@ Dans les exemples, `monequipe` est votre équipe et `hello` votre app.
 | Voir les journaux de mon application | [Vos accès](#vos-accès) |
 | Utiliser `kubectl` | [kubectl sur dev](#kubectl-sur-dev) |
 | Configurer un secret | [Secrets](#secrets) |
-| Ajouter une base de données | [Vos données](#vos-données) |
+| Ajouter une base de données | [Vos données](#vos-données), [exemple SQLite](#exemple--une-app-avec-une-base-sqlite) |
+| Garder mon image privée | [Image publique ou privée](#image-publique-ou-privée) |
 | Comprendre un refus ou une erreur | [Dépannage](reference.md#dépannage) |
 
 ## Comment ça marche
@@ -104,6 +105,57 @@ spec:
 - **Suppression** : sur cette plateforme, Argo CD supprime ce qui disparaît de `main` et le stockage efface les
   données d'un volume supprimé. Protégez chaque volume qui compte par l'annotation décrite ci-dessus.
 
+### Exemple : une app avec une base SQLite
+
+Cas le plus simple d'une app qui garde des données (Django, Rails, une petite API) : la base est un fichier sur le
+volume. En plus du volume ci-dessus, quelques points dans le Deployment de `base/app.yaml` :
+
+```yaml
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate                # volume ReadWriteOnce et SQLite : un seul pod à la fois, l'ancien s'arrête d'abord
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000             # le volume devient inscriptible par l'utilisateur de l'image
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: hello
+          resources:
+            limits: {cpu: 500m, memory: 384Mi, ephemeral-storage: 256Mi}  # marge pour le cache d'écriture (gVisor)
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+              httpHeaders:
+                - name: Host        # la sonde arrive sur l'IP du pod : un framework qui filtre les hôtes
+                  value: localhost  # (ALLOWED_HOSTS de Django) répondrait 400 ; localhost doit y figurer
+          volumeMounts:
+            - name: donnees
+              mountPath: /data    # la base et tout fichier à garder
+      volumes:
+        - name: donnees
+          persistentVolumeClaim:
+            claimName: donnees
+```
+
+- **Les migrations** s'exécutent au démarrage du conteneur (commande de l'image), avant le serveur : avec `Recreate`,
+  aucune autre version n'écrit en même temps.
+- **Le premier compte d'administration** se crée à la main sur dev, une fois l'app démarrée :
+  `kubectl exec -it -n monequipe-hello deploy/hello -- <commande de création>` ([kubectl sur dev](#kubectl-sur-dev)).
+  En prod, où vous n'avez pas `kubectl`, prévoyez une variable lue au premier démarrage, alimentée par un
+  [secret](#secrets).
+- **Clé secrète du framework** : jamais dans l'image ni en clair dans `env:` ; un [secret](#secrets), ou un fichier
+  généré au premier démarrage sur le volume.
+- **Sauvegarde** : copiez la base par l'outil de SQLite (`sqlite3 /data/db.sqlite3 ".backup /tmp/copie"`), puis
+  envoyez la copie vers votre stockage S3 ; jamais une copie brute du fichier pendant une écriture.
+
 ## Déployer votre propre application
 
 Le modèle déploie une page nginx. Pour mettre à sa place votre API FastAPI, votre app Node ou votre site Next.js,
@@ -120,6 +172,8 @@ images:
     newTag: 0.1.0
     digest: sha256:<64 caractères hexadécimaux>
 ```
+
+L'image doit être publique, ou privée avec un jeton : [Image publique ou privée](#image-publique-ou-privée).
 
 **2. Le port**, dans `base/app.yaml`, à trois endroits qui doivent concorder : `containerPort`, le port de la
 `readinessProbe` et le `targetPort` du Service. Votre app doit écouter sur un port supérieur à 1024 (par exemple
@@ -156,6 +210,44 @@ vient le plus souvent d'un port qui ne concorde pas, d'une sonde sur une mauvais
 ou d'une image qui exige root ou un disque inscriptible.
 
 Les règles exactes que doit respecter votre manifest sont dans la [référence](reference.md#les-règles).
+
+### Image publique ou privée
+
+Le cluster télécharge une image **publique** sans identifiant. Une image contient votre application entière : pour
+Python, Node ou PHP, le **code source en clair**. Ne la publiez que si votre code pourrait l'être aussi ; sur GitHub,
+la visibilité d'une image (*package*) se règle à part de celle du dépôt (page du paquet, *Package settings*). Aucune
+image, publique ou privée, ne contient de secret : les secrets arrivent au démarrage ([Secrets](#secrets)).
+
+Image **privée** : la plateforme ne fournit pas de registre ; vous gardez le vôtre et donnez au cluster un
+identifiant en **lecture seule, limité à cette image** :
+
+| Registre | Identifiant conseillé |
+|---|---|
+| `ghcr.io` | un **compte machine** GitHub, ajouté en lecture au seul paquet (page du paquet, *Manage access*), avec un jeton classique `read:packages` à expiration. Un jeton de votre compte personnel lirait tous vos paquets et ceux de vos organisations |
+| `quay.io` | un *robot account* en lecture sur le dépôt |
+| `docker.io` | un jeton d'accès limité au dépôt, en lecture |
+
+Scellez-le comme tout secret (le jeton est lu sans écho, il ne reste ni à l'écran ni dans l'historique), puis
+nommez-le dans le pod :
+
+```bash
+read -rs JETON   # collez le jeton, puis Entrée
+kubectl create secret docker-registry registre -n monequipe-hello \
+  --docker-server=ghcr.io --docker-username=<compte machine> --docker-password="$JETON" --dry-run=client -o yaml \
+  | kubeseal --cert sealing-dev.pem --scope strict --format yaml > deploy/hello/dev/registre.sealed.yaml
+unset JETON
+```
+
+```yaml
+    spec:
+      imagePullSecrets:
+        - name: registre
+```
+
+Même chose pour `prod/` avec `sealing-prod.pem`. Une autre équipe ne peut pas lancer votre image, même déjà présente
+sur le serveur : le serveur ne réutilise une image privée en cache que pour un pod qui présente vos identifiants, et
+la redemande sinon au registre, qui refuse. Changer de jeton (rotation, expiration) : rescellez, fusionnez ; l'image
+est retirée une fois avec le nouveau jeton.
 
 ## Livrer une version
 
